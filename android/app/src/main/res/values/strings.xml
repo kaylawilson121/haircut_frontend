@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">haircut</string>
+    <string name="title_activity_main">haircut</string>
+    <string name="package_name">haircut.com</string>
+    <string name="custom_url_scheme">haircut.com</string>
+</resources>
