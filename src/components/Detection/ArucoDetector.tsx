@@ -68,7 +68,7 @@ const ArucoDetector: React.FC<ArucoDetectorProps> = ({ onPoseUpdate }) => {
     }
     try {
       // wsRef.current = new WebSocket("wss://api.fadeaway.app/ws")
-      wsRef.current = new WebSocket("ws://localhost:8001/ws")
+      wsRef.current = new WebSocket("wss://api.fadeaway.app/ws")
 
       wsRef.current.onopen = () => {
         console.log("WebSocket connected for 3D tracking")
