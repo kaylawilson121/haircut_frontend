@@ -281,7 +281,7 @@ const ArucoDetector: React.FC<ArucoDetectorProps> = ({ onPoseUpdate }) => {
     if (isCameraReady && isSocketOpen && !intervalRef.current) {
       timeoutRef.current = setTimeout(() => {
         console.log("Starting frame processing interval");
-        intervalRef.current = setInterval(processCameraFrame, 500);
+        intervalRef.current = setInterval(processCameraFrame, 100);
       }, 200);
     }
 
