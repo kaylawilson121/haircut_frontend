@@ -58,7 +58,23 @@ const PhotoUpload = ({
   const [wholeProgress, setWholeProgress] = useState(0);
   const [allProgress, setAllProgress] = useState(0);
 
-  const startCamera = async (slot) => {
+  // Order and helper to enable slots one-by-one
+  const ORDER = ['front', 'left', 'right'];
+  const isSlotEnabled = (key: string) => {
+    const idx = ORDER.indexOf(key);
+    if (idx <= 0) return true; // front always enabled
+    const prev = ORDER[idx - 1];
+    return !!selectPhotos[prev]?.preview; // enabled only if previous slot's bald image exists
+  };
+
+  const startCamera = async (slot?) => {
+    // Prevent starting camera for next slots until previous processed
+    if (slot && !isSlotEnabled(slot)) {
+      // small UX hint, you can adjust to a nicer toast/modal
+      alert(`Please complete the ${ORDER[ORDER.indexOf(slot) - 1]} slot first.`);
+      return;
+    }
+
     setCapturing(true);
     if(slot === 'front' || slot === 'left' || slot === 'right') {
       setCapturingSlot(slot);
@@ -136,22 +152,31 @@ const PhotoUpload = ({
   };
 
   const handleSinglePhoto = async (event, key) => {
+    if (!isSlotEnabled(key)) {
+      alert(`Please complete the previous image before uploading ${key}.`);
+      return;
+    }
     const file = event.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onloadend = async () => {
+      const dataUrl = reader.result as string;
       setPhotos(prev => ({
         ...prev,
-        [key]: { preview: reader.result, processing: true }
+        [key]: { preview: dataUrl, processing: true }
       }));
-      const processed = await uploadAndReplace(reader.result as string);
+      const processed = await uploadAndReplace(dataUrl);
       setPhotos(prev => ({
         ...prev,
         [key]: { preview: processed, processing: true }
       }));
-      
+      // processImage will set selectPhotos[slot].preview and set processing false
       await processImage(key, processed);
-      onPhotoUpload({ ...photos, [key]: { preview: processed, processing: false } });
+
+      // Notify parent with the updated single-slot result (optional)
+      if (onPhotoUpload) {
+        onPhotoUpload({ ...photos, [key]: { preview: processed, processing: false } });
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -444,19 +469,30 @@ const PhotoUpload = ({
               <div className="flex flex-col items-center gap-2">
                 <button
                   className="w-32 h-32 flex items-center justify-center bg-gray-200 rounded shadow mb-1"
-                  onClick={() => fileInputRefs[key].current.click()}
+                  onClick={() => {
+                    if (!isSlotEnabled(key)) {
+                      alert(`Please complete the ${ORDER[Math.max(0, ORDER.indexOf(key)-1)]} slot first.`);
+                      return;
+                    }
+                    fileInputRefs[key].current.click();
+                  }}
                   type="button"
+                  disabled={!isSlotEnabled(key)}
                 >
-                  <FaUpload className="text-2xl text-gray-500" />
+                  <FaUpload className={`text-2xl text-gray-500 ${!isSlotEnabled(key) ? 'opacity-40' : ''}`} />
                 </button>
                 <button
                   className="w-10 h-10 flex items-center justify-center bg-gray-200 rounded-full shadow"
                   onClick={() => startCamera(key)}
                   type="button"
                   title={`Take ${label} Photo`}
+                  disabled={!isSlotEnabled(key)}
                 >
-                  <FaCamera className="text-xl text-gray-700" />
+                  <FaCamera className={`text-xl ${!isSlotEnabled(key) ? 'opacity-40' : ''}`} />
                 </button>
+                {!isSlotEnabled(key) && (
+                  <div className="text-xs text-gray-400 mt-2">Complete previous slot first</div>
+                )}
               </div>
             )}
             <input
