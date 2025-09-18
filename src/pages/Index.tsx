@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState } from 'react'
 import ThreeScene, { PoseMap } from '@/components/ThreeD/ThreeScene'
 import ThreeWorld from '@/components/ThreeD/ThreeWorld';
@@ -15,30 +14,15 @@ const Index = () => {
   const [buttonText, setButtonText] = useState('Switch to 3D World');
   const [headText, setHeadText] = useState('3D Marker Tracking with Arucos');
 
-  useEffect(() => {
-    async () => {
-      if (showThreeScene) {
-        await CameraPreview.stop();
-        await CameraPreview.start({
-          parent: 'camera-preview',
-          position: 'rear',
-          toBack: false,
-          width: 320,
-          height: 240,
-        });
-      } else {
-        CameraPreview.stop();
-      }
-      return () => {
-        CameraPreview.stop();
-      };
-    }
-  }, [showThreeScene]);
+  // CameraPreview should be controlled by the ArucoDetector component itself.
+  // Removing page-level camera control avoids conflicts on emulators (LD Player)
+  // where multiple start/stop calls can leave the camera locked.
 
   const handleButtonClick = () => {
-    setShowThreeScene(!showThreeScene);
-    setButtonText(showThreeScene ? 'Back to 3D Scene' : 'Switch to 3D World');
-    setHeadText(!showThreeScene ? '3D Marker Tracking with Arucos' : '3D Builder with Images');
+    const next = !showThreeScene;
+    setShowThreeScene(next);
+    setButtonText(next ? 'Switch to 3D World' : 'Back to 3D Scene');
+    setHeadText(next ? '3D Marker Tracking with Arucos' : '3D Builder with Images');
   };
   
   return (
