@@ -50,6 +50,7 @@ const ArucoDetector: React.FC<ArucoDetectorProps> = ({ onPoseUpdate }) => {
       startingCameraRef.current = true;
       try {
         await CameraPreview.stop();
+        alert("stop aruco2")
       } catch (stopErr) {
         // ignore stop errors
         console.warn('CameraPreview.stop() warning:', stopErr);
@@ -91,6 +92,7 @@ const ArucoDetector: React.FC<ArucoDetectorProps> = ({ onPoseUpdate }) => {
     return () => {
       try {
         CameraPreview.stop();
+        alert("stop aruco2")
       } catch (err) {
         /* ignore */
       }
