@@ -114,7 +114,7 @@ const PhotoUpload = ({
     } as CameraPreviewPictureOptions);
 
     const dataUrl = `data:image/jpeg;base64,${result.value}`;
-    await CameraPreview.stop();
+    // await CameraPreview.stop();
     alert("stop upload2")
     setCapturing(false);
 
