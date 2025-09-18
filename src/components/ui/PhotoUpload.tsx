@@ -99,8 +99,7 @@ const PhotoUpload = ({
         height: 320,
       });
     } else {
-      // CameraPreview.stop();
-      // alert("stop upload1")
+      CameraPreview.stop();
     }
   }, [capturing]);
 
@@ -114,7 +113,7 @@ const PhotoUpload = ({
     } as CameraPreviewPictureOptions);
 
     const dataUrl = `data:image/jpeg;base64,${result.value}`;
-    // await CameraPreview.stop();
+    await CameraPreview.stop();
     alert("stop upload2")
     setCapturing(false);
 
