@@ -44,43 +44,80 @@ const ArucoDetector: React.FC<ArucoDetectorProps> = ({ onPoseUpdate }) => {
   const startingCameraRef = useRef<boolean>(false); // NEW: avoid double starts
 
   
+  // --- ADD: simple global ref-counted CameraPreview helpers ---
+  async function startCameraOnce(options: any) {
+  	// use window as a global shared container to avoid adding new files
+  	;(window as any).__cameraRefCount = (window as any).__cameraRefCount || 0;
+  	;(window as any).__cameraStarting = (window as any).__cameraStarting || false;
+  	;(window as any).__cameraStartPromise = (window as any).__cameraStartPromise || null;
+
+  	if ((window as any).__cameraRefCount > 0) {
+  		(window as any).__cameraRefCount++;
+  		return;
+  	}
+  	if ((window as any).__cameraStarting && (window as any).__cameraStartPromise) {
+  		await (window as any).__cameraStartPromise;
+  		(window as any).__cameraRefCount++;
+  		return;
+  	}
+
+  	(window as any).__cameraStarting = true;
+  	(window as any).__cameraStartPromise = CameraPreview.start(options)
+  		.then(() => {
+  			(window as any).__cameraStarting = false;
+  			(window as any).__cameraStartPromise = null;
+  			(window as any).__cameraRefCount = ((window as any).__cameraRefCount || 0) + 1;
+  		})
+  		.catch((err: any) => {
+  			(window as any).__cameraStarting = false;
+  			(window as any).__cameraStartPromise = null;
+  			throw err;
+  		});
+  	await (window as any).__cameraStartPromise;
+  }
+
+  async function stopCameraOnce() {
+  	;(window as any).__cameraRefCount = (window as any).__cameraRefCount || 0;
+  	(window as any).__cameraRefCount = Math.max(0, (window as any).__cameraRefCount - 1);
+  	if ((window as any).__cameraRefCount > 0) return;
+  	try {
+  		await CameraPreview.stop();
+  	} catch (err) {
+  		console.warn('CameraPreview.stop() failed/ignored', err);
+  	}
+  }
+  // --- END helpers ---
+
   useEffect( ()=> {
     const initializeCamera = async () => {
       if (startingCameraRef.current) return; // already starting
       startingCameraRef.current = true;
       try {
-        await CameraPreview.stop();
-      } catch (stopErr) {
-        // ignore stop errors
-        console.warn('CameraPreview.stop() warning:', stopErr);
-      }
-
-      try {
-        await CameraPreview.start({
-          parent: "camera-preview",
-          position: "rear",
-          x: 60,
-          y: 700,
-          width: CANVAS_WIDTH,
-          height: CANVAS_HEIGHT,
-          toBack: false,
-          className: "",
-        });
-        initializeWebSocket();
-        setIsCameraReady(true);
-        cameraReadyRef.current = true;
+-        await CameraPreview.stop();
+-      } catch (stopErr) {
+-        // ignore stop errors
+-        console.warn('CameraPreview.stop() warning:', stopErr);
+-      }
++        // Use ref-counted wrapper to avoid double starts/stops
++        await stopCameraOnce().catch(() => {});
++        await startCameraOnce({
++          parent: "camera-preview",
++          position: "rear",
++          x: 60,
++          y: 700,
++          width: CANVAS_WIDTH,
++          height: CANVAS_HEIGHT,
++          toBack: false,
++          className: "",
++        });
++        initializeWebSocket();
++        setIsCameraReady(true);
++        cameraReadyRef.current = true;
       } catch (startErr: any) {
-        // ignore the "camera_already_started" error but surface others
         const msg = startErr?.message ?? String(startErr);
-        if (msg && msg.includes('camera_already_started')) {
-          console.warn('Camera already started, continuing.');
-          initializeWebSocket();
-          setIsCameraReady(true);
-          cameraReadyRef.current = true;
-        } else {
-          console.error('CameraPreview.start() failed:', startErr);
-          setError('Camera start failed: ' + msg);
-        }
+        // surface useful errors, but tolerate already-started situations
+        console.error('CameraPreview.start() failed:', startErr);
+        setError('Camera start failed: ' + msg);
       } finally {
         startingCameraRef.current = false;
       }
@@ -89,11 +126,14 @@ const ArucoDetector: React.FC<ArucoDetectorProps> = ({ onPoseUpdate }) => {
 
     // cleanup native preview on unmount
     return () => {
-      try {
-        CameraPreview.stop();
-      } catch (err) {
-        /* ignore */
-      }
+-      try {
+-        CameraPreview.stop();
+-      } catch (err) {
+-        /* ignore */
+-      }
++    // decrement refcount and stop only if nobody else needs the camera
++    stopCameraOnce().catch(() => {});
++    // also clear timers / close ws etc. (existing cleanup occurs elsewhere)
     };
   }, []);
 

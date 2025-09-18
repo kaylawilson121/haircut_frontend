@@ -2,6 +2,49 @@ import React, { useEffect, useRef, useState } from 'react';
 import { FaCamera, FaUpload, FaCogs, FaCheckCircle, FaTimes, FaExpand } from "react-icons/fa";
 import { CameraPreview, CameraPreviewPictureOptions } from '@capacitor-community/camera-preview';
 
+// --- ADD: local ref-counted CameraPreview helpers (same logic as in ArucoDetector) ---
+async function startCameraOnce(options: any) {
+  (window as any).__cameraRefCount = (window as any).__cameraRefCount || 0;
+  (window as any).__cameraStarting = (window as any).__cameraStarting || false;
+  (window as any).__cameraStartPromise = (window as any).__cameraStartPromise || null;
+
+  if ((window as any).__cameraRefCount > 0) {
+    (window as any).__cameraRefCount++;
+    return;
+  }
+  if ((window as any).__cameraStarting && (window as any).__cameraStartPromise) {
+    await (window as any).__cameraStartPromise;
+    (window as any).__cameraRefCount++;
+    return;
+  }
+
+  (window as any).__cameraStarting = true;
+  (window as any).__cameraStartPromise = CameraPreview.start(options)
+    .then(() => {
+      (window as any).__cameraStarting = false;
+      (window as any).__cameraStartPromise = null;
+      (window as any).__cameraRefCount = ((window as any).__cameraRefCount || 0) + 1;
+    })
+    .catch((err: any) => {
+      (window as any).__cameraStarting = false;
+      (window as any).__cameraStartPromise = null;
+      throw err;
+    });
+  await (window as any).__cameraStartPromise;
+}
+
+async function stopCameraOnce() {
+  (window as any).__cameraRefCount = (window as any).__cameraRefCount || 0;
+  (window as any).__cameraRefCount = Math.max(0, (window as any).__cameraRefCount - 1);
+  if ((window as any).__cameraRefCount > 0) return;
+  try {
+    await CameraPreview.stop();
+  } catch (err) {
+    console.warn('CameraPreview.stop() failed/ignored', err);
+  }
+}
+// --- END helpers ---
+
 const LABELS = [
   { key: 'front', label: 'Front' },
   { key: 'left', label: 'Left Side' },
@@ -75,37 +118,30 @@ const PhotoUpload = ({
       return;
     }
 
+    // Use ref-counted start so multiple components don't collide
     setCapturing(true);
-    if(slot === 'front' || slot === 'left' || slot === 'right') {
+    if (slot === 'front' || slot === 'left' || slot === 'right') {
       setCapturingSlot(slot);
     }
-    
-    await CameraPreview.start({
-      parent: 'camera-preview', // The id of the div where preview will be shown
-      position: 'rear',
-      toBack: false,
-      width: 320,
-      height: 320,
-    });
-  };
-  
-  useEffect(() => {
-    if (capturing) {
-      CameraPreview.start({
+    try {
+      await startCameraOnce({
         parent: 'camera-preview',
         position: 'rear',
         toBack: false,
         width: 320,
         height: 320,
       });
-    } else {
-      CameraPreview.stop();
+    } catch (err) {
+      console.error('Failed to start camera for capture', err);
+      setCapturing(false);
     }
-  }, [capturing]);
-
+  };
+  
   useEffect(() => {
-    setAllProgress(Math.floor(baldProgress / 2 + wholeProgress / 2))
-  }, [baldProgress, wholeProgress])
+    return () => {
+      stopCameraOnce().catch(() => {});
+    };
+  }, []);
 
   const capturePhoto = async () => {
     const result = await CameraPreview.capture({
@@ -113,7 +149,8 @@ const PhotoUpload = ({
     } as CameraPreviewPictureOptions);
 
     const dataUrl = `data:image/jpeg;base64,${result.value}`;
-    await CameraPreview.stop();
+    // stop with ref-counted helper
+    await stopCameraOnce();
     setCapturing(false);
 
     if (capturingSlot) {
@@ -651,7 +688,9 @@ const PhotoUpload = ({
             </button>
             <button
               className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg shadow text-lg font-semibold transition flex items-center justify-center gap-2"
-              onClick={() => {
+              onClick={async () => {
+                // ensure native preview is stopped on cancel
+                await stopCameraOnce();
                 setCapturing(false);
               }}
             >
