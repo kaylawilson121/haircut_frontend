@@ -99,8 +99,8 @@ const PhotoUpload = ({
         height: 320,
       });
     } else {
-      CameraPreview.stop();
-      alert("stop upload1")
+      // CameraPreview.stop();
+      // alert("stop upload1")
     }
   }, [capturing]);
 

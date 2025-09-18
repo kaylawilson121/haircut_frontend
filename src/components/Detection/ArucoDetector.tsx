@@ -91,8 +91,8 @@ const ArucoDetector: React.FC<ArucoDetectorProps> = ({ onPoseUpdate }) => {
     // cleanup native preview on unmount
     return () => {
       try {
-        CameraPreview.stop();
-        alert("stop aruco2")
+        // CameraPreview.stop();
+        // alert("stop aruco1")
       } catch (err) {
         /* ignore */
       }
