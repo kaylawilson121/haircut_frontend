@@ -1,12 +1,16 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 import { useFrame, useLoader } from '@react-three/fiber';
 // @ts-ignore
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import type { Mesh } from 'three';
 import { toast } from '@/components/ui/use-toast';
 import * as THREE from 'three';
 import { ModelsConfig } from '@/modelsConfig';
+import { useGLTF } from '@react-three/drei';
+import { FaceMesh } from "@mediapipe/face_mesh";
+import { CameraPreview } from '@capacitor-community/camera-preview';
+import { estimateHeadPoseFromLandmarks } from '@/utils/facePoseEstimator';
 
 interface HeadModelProps {
   pose: {
@@ -14,19 +18,20 @@ interface HeadModelProps {
     rotation: [number, number, number];
   } | null;
   setCameraDistance: (distance: number) => void;
+  wholeModelUrl?: string | null;
 }
-
+let faceMesh, landmark;
 const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
-  ({ pose, setCameraDistance }, ref) => {
+  ({ pose, setCameraDistance, wholeModelUrl }, ref) => {
     const meshRef = useRef<THREE.Group>(null);
     const [modelLoaded, setModelLoaded] = useState(false);
     const worldBoxRef = useRef<THREE.Box3>(new THREE.Box3());
     const [initialBox, setInitialBox] = useState<THREE.Box3 | null>(null);
     const modelCenterRef = useRef<THREE.Vector3>(new THREE.Vector3());
     const [objCentered, setObjCentered] = useState(false);
-    
-    // Use useLoader for the OBJ file, handling errors properly
-    const obj = useLoader(
+
+    // Load default model
+    const defaultModel = useLoader(
       OBJLoader, 
       ModelsConfig.HeadModel.modelPath,
       undefined,  // No extensions
@@ -35,6 +40,110 @@ const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
         //console.log(`Loading [${ModelsConfig.HeadModel.modelPath}] 3D model...`, event.loaded / event.total * 100, '%');
       }
     );
+
+    const [customModel, setCustomModel] = useState<THREE.Group | null>(defaultModel);
+    const [model, setModel] = useState<THREE.Group | null>(defaultModel);
+
+    const cameraReadyRef = useRef<boolean>(false);
+    const startingCameraRef = useRef<boolean>(false); // NEW: avoid double starts
+    const [isCameraReady, setIsCameraReady] = useState(false);
+
+    // Add material constants
+    const defaultMaterial = new THREE.MeshStandardMaterial({
+      color: 0xDDBEA9,
+      roughness: 0.7,
+      metalness: 0.1,
+      side: THREE.DoubleSide // Add this to render both sides
+    });
+    useEffect(() => {
+      const initializeCamera = async () => {
+        if (startingCameraRef.current) return; // already starting
+        startingCameraRef.current = true;
+        try {
+          await CameraPreview.stop();
+        } catch (stopErr) {
+          // ignore stop errors
+          console.warn('CameraPreview.stop() warning:', stopErr);
+        }
+  
+        try {
+          await CameraPreview.start({
+            parent: "camera-preview",
+            position: "rear",
+            x: 60,
+            y: 700,
+            width: 600,
+            height: 400,
+            toBack: false,
+            className: "",
+          });
+          setIsCameraReady(true);
+          cameraReadyRef.current = true;
+        } catch (startErr: any) {
+          // ignore the "camera_already_started" error but surface others
+          const msg = startErr?.message ?? String(startErr);
+          if (msg && msg.includes('camera already started')) {
+            console.warn('Camera already started, continuing.');
+            setIsCameraReady(true);
+            cameraReadyRef.current = true;
+          } else {
+            console.error('CameraPreview.start() failed:', startErr);
+          }
+        } finally {
+          startingCameraRef.current = false;
+        }
+      };
+      initializeCamera();
+      faceMesh = new FaceMesh({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+      });
+      console.log(faceMesh);
+      faceMesh.setOptions({
+        maxNumFaces: 1,
+        refineLandmarks: true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5,
+      });
+
+      faceMesh.onResults((results) => {
+        if (results.multiFaceLandmarks.length > 0) {
+          landmark = results.multiFaceLandmarks[0];
+        }
+      });
+    }, [])
+
+    // Load custom model when URL is provided
+    useEffect(() => {
+      if (!wholeModelUrl) {
+        setCustomModel(null);
+        return;
+      }
+
+      const loader = new GLTFLoader();
+      loader.load(
+        wholeModelUrl,
+        (gltf) => {
+          // Apply materials to all meshes in the GLTF
+          gltf.scene.traverse((child) => {
+            if (child instanceof THREE.Mesh) {
+              // child.material = defaultMaterial.clone();
+              child.castShadow = true;
+              child.receiveShadow = true;
+            }
+          });
+          setCustomModel(gltf.scene);
+          setModel(gltf.scene);
+          console.log("change model")
+        },
+        undefined,
+        (error) => {
+          console.error('Error loading custom head model:', error);
+          setCustomModel(null);
+        }
+      );
+    }, [wholeModelUrl]);
+
+    // Use customModel if available, otherwise use defaultModel
 
     // Imperative handle to expose the getWorldBox method
     React.useImperativeHandle(ref, () => {
@@ -76,7 +185,7 @@ const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
 
     // Set model as loaded when obj is available
     useEffect(() => {
-      if (obj && meshRef.current && !objCentered) {
+      if (model && meshRef.current && !objCentered) {
         setModelLoaded(true);
         toast({
           title: `${ModelsConfig.HeadModel.name} 3D Model loaded successfully`,
@@ -84,7 +193,7 @@ const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
         });
         
         // Calculate model size and appropriate camera distance
-        const localBox = new THREE.Box3().setFromObject(obj);
+        const localBox = new THREE.Box3().setFromObject(model);
         const size = new THREE.Vector3();
         localBox.getSize(size);
         //console.log(`${ModelsConfig.HeadModel.name} size in units:`, size);
@@ -95,19 +204,17 @@ const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
         //console.log("Head model center:", modelCenter);
         
         // Create a clean clone of the object
-        const centeredObj = obj.clone();
+        const centeredObj = model.clone();
         
         // Center the object's geometry around its own origin for proper rotation
         centeredObj.position.set(-modelCenter.x, -modelCenter.y, -modelCenter.z);
         
-        // Apply materials to the centered object
+        // Apply materials and shadows
         centeredObj.traverse((child: THREE.Object3D) => {
           if (child instanceof THREE.Mesh) {
-            child.material = new THREE.MeshStandardMaterial({
-              color: 0xDDBEA9, // Skin-like color
-              roughness: 0.7,
-              metalness: 0.1,
-            });
+            // child.material = defaultMaterial.clone();
+            child.castShadow = true;
+            child.receiveShadow = true;
           }
         });
         
@@ -139,24 +246,49 @@ const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
         
         calculateCameraDistance(centeredLocalBox, size);
       }
-    }, [obj, setCameraDistance, objCentered]);
+    }, [model, setCameraDistance, objCentered]);
 
-    useFrame(() => {
-      if (!meshRef.current || !pose || !initialBox) return;
+    const capture = (async () => {
+      console.log("Capturing frame for face mesh");
+      if (!cameraReadyRef.current) return;
+      console.log("Capturing frame for face mesh");
+      const result = await CameraPreview.captureSample({ quality: 0.4 * 100 });
+      if (!result || !result.value) {
+        console.warn('captureSample returned empty result, skipping frame');
+        return;
+      }
+      const base64Value = result.value;
+      const frameData = "data:image/jpeg;base64," + base64Value;
+      await faceMesh.send({ image: frameData });
+    })
+
+    setInterval(capture, 100);
     
+    useFrame(() => {
+      console.log("HeadModel useFrame", pose, landmark);
+      if (!meshRef.current || !initialBox) return;
+      // derive face-based pose (from mediapipe landmarks) when points are available
+      const facePose = (landmark && landmark.length > 0) ? estimateHeadPoseFromLandmarks(landmark) : null;
+      console.log("Estimated facePose from landmarks:", facePose);
+      // UI toggle to prefer face-mesh pose over aruco markers
+      const [useFacePose, setUseFacePose] = useState<boolean>(true);
+
+      const effectiveHeadPose = facePose ? facePose : pose;
+      // const effectiveHeadPose = pose;
+
       // Position: pose.position is in centimeters, convert to meters and invert X because camera view is mirrored
       meshRef.current.position.set(
-        -pose.position[0] / 100, 
-        pose.position[1] / 100, 
-        pose.position[2] / 100
+        -effectiveHeadPose.position[0] / 100, 
+        effectiveHeadPose.position[1] / 100, 
+        effectiveHeadPose.position[2] / 100
       );
 
       // Rotation: convert degrees to radians and invert X and Y axis to match Three.js coordinate system
       const degToRad = (deg: number) => (deg * Math.PI) / 180;
       meshRef.current.rotation.set(
-        degToRad(-pose.rotation[0]),
-        degToRad(-pose.rotation[1]),
-        degToRad(pose.rotation[2])
+        degToRad(-effectiveHeadPose.rotation[0]),
+        degToRad(-effectiveHeadPose.rotation[1]),
+        degToRad(effectiveHeadPose.rotation[2])
       );
       
       // Update world matrix
@@ -180,7 +312,7 @@ const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
       }
     });
 
-    if (!obj) {
+    if (!model) {
       return null;
     }
     
@@ -189,7 +321,9 @@ const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
         ref={meshRef} 
         name="HeadModel"
         scale={ModelsConfig.HeadModel.scale}
-        visible = {false}
+        visible={true}
+        castShadow
+        receiveShadow
       />
     );
   }

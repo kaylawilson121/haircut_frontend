@@ -1,74 +1,106 @@
-# Welcome to your Lovable project
-- Master is the actual main branch. main is just what loveable uses
+# 3D Haircut Preview Application
 
-## Project info
+A React-based web application that allows users to create and visualize 3D head models with AR tracking and photo upload capabilities.
 
-**URL**: https://lovable.dev/projects/0f0119da-18f7-4723-b886-8eecf9dc4648
+## Features
 
-## How can I edit this code?
+### 1. Photo Upload & Processing
 
-There are several ways of editing your application.
+- Multi-angle photo capture (Front, Left, Right sides)
+- Camera preview integration using Capacitor
+- Image processing and segmentation
+- Progress tracking for model generation
+- Support for both camera capture and file upload
 
-**Use Lovable**
+### 2. 3D Visualization
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/0f0119da-18f7-4723-b886-8eecf9dc4648) and start prompting.
+#### ThreeWorld Component
 
-Changes made via Lovable will be committed automatically to this repo.
+- Split-screen view showing both whole head and bald models
+- Independent camera controls for each view
+- Environment lighting and shadows
+- Model scaling and positioning controls
 
-**Use your preferred IDE**
+#### ThreeScene Component
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- Real-time AR tracking using Aruco markers
+- Face mesh tracking using MediaPipe
+- Interactive 3D model manipulation
+- Debug panel for pose information
+- Trimmer tool visualization and interaction
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### 3. Model Management
 
-Follow these steps:
+- Supports both default and custom GLTF models
+- Real-time model switching
+- Material preservation from original models
+- Shadow and lighting optimization
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## Technical Stack
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+- React + TypeScript
+- Three.js + React Three Fiber
+- @react-three/drei for 3D utilities
+- MediaPipe for face tracking
+- Capacitor for camera integration
+- TailwindCSS for styling
 
-# Step 3: Install the necessary dependencies.
-npm i
+## Key Components
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+1. **PhotoUpload**
+   - Manages photo capture and upload
+   - Handles model generation process
+   - Progress tracking and UI feedback
+
+2. **ThreeScene**
+   - Main AR visualization component
+   - Handles marker-based tracking
+   - Manages 3D model rendering and pose updates
+
+3. **HeadModel**
+   - Handles 3D head model loading and rendering
+   - Integrates face tracking
+   - Manages model transformations and materials
+
+4. **ThreeWorld**
+   - Split-view 3D model preview
+   - Independent camera controls
+   - Environment and lighting setup
+
+## Installation
+
+```bash
+npm install
+# or
+yarn install
 ```
 
-**Edit a file directly in GitHub**
+## Development
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+npm run dev
+# or
+yarn dev
+```
 
-**Use GitHub Codespaces**
+## Building
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```bash
+npm run build
+# or
+yarn build
+```
 
-## What technologies are used for this project?
+## Environment Setup
 
-This project is built with:
+Required environment variables:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- Backend API endpoints for model processing
+- MediaPipe face mesh configuration
+- Camera preview settings
 
-## How can I deploy this project?
+## Notes
 
-Simply open [Lovable](https://lovable.dev/projects/0f0119da-18f7-4723-b886-8eecf9dc4648) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+- Camera permissions required for AR features
+- WebGL support required for 3D rendering
+- Network connection required for model processing

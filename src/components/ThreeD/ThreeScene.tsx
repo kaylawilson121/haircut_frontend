@@ -1,7 +1,7 @@
-
-import React, { Suspense, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Grid } from '@react-three/drei';
+import { OrbitControls, Environment, Grid } from '@react-three/drei';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import HeadModel from './Models/HeadModel';
 import TrimmerModel from './Models/TrimmerModel';
 import FallbackCube from './FallbackCube';
@@ -26,9 +26,11 @@ export interface PoseMap {
 
 export interface ThreeSceneProps {
   poses: PoseMap | null;
+  wholeModelUrl?: string | null;
+  baldModelUrl?: string | null;
 }
 
-const ThreeScene: React.FC<ThreeSceneProps> = ({ poses }) => {
+const ThreeScene: React.FC<ThreeSceneProps> = ({ poses, wholeModelUrl, baldModelUrl }) => {
   const headRef = useRef<THREE.Group>(null);
   const trimmerRef = useRef<THREE.Group>(null);
   const [cameraDistance, setCameraDistance] = useState(0);
@@ -40,6 +42,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ poses }) => {
   // Head override state
   const [isHeadOverrideEnabled, setIsHeadOverrideEnabled] = useState(false);
   const [headManualRotation, setHeadManualRotation] = useState<[number, number, number]>([0, 0, 0]);
+  const [loadedModel, setLoadedModel] = useState<THREE.Group | null>(null);
   
   const { showFallback, isTrimmerTouching } = useSceneControls();
 
@@ -51,6 +54,26 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ poses }) => {
     ? { position: manualPosition, rotation: manualRotation }
     : poses?.[ModelsConfig.TrimmerModel.arucoMarkerId] || null;
   
+  useEffect(() => {
+    if (!wholeModelUrl) {
+      setLoadedModel(null);
+      return;
+    }
+
+    const loader = new GLTFLoader();
+    loader.load(
+      wholeModelUrl,
+      (gltf) => {
+        setLoadedModel(gltf.scene);
+      },
+      undefined,
+      (error) => {
+        console.error('Error loading model:', error);
+        setLoadedModel(null);
+      }
+    );
+  }, [wholeModelUrl]);
+
   const handlePositionChange = (axis: 'x' | 'y' | 'z', value: number) => {
     const axisIndex = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
     const newPosition: [number, number, number] = [...manualPosition];
@@ -102,12 +125,20 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ poses }) => {
       <Canvas
         style={{ height: 600, width: '100%', background: '#1A1F2C' }}
         camera={{ position: [0, 5, 15] }}
+        shadows // Enable shadows
       >
-        <ambientLight intensity={1.2} />
-        <pointLight position={[10, 10, 10]} intensity={2} />
-        <directionalLight position={[-5, 5, 5]} intensity={1.5} color="white" />
-        <directionalLight position={[5, -5, 5]} intensity={0.8} color="#ffaa77" />
-
+        {/* Update lighting for better visibility */}
+        <ambientLight intensity={0.5} />
+        <directionalLight 
+          position={[10, 10, 5]} 
+          intensity={1} 
+          castShadow
+          shadow-mapSize-width={2048}
+          shadow-mapSize-height={2048}
+        />
+        <directionalLight position={[-5, 5, 5]} intensity={0.5} />
+        <directionalLight position={[5, -5, 5]} intensity={0.3} />
+        
         <Grid 
           infiniteGrid 
           cellSize={0.5}
@@ -119,6 +150,7 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ poses }) => {
         <GridLabels />
         <SceneLabels />
 
+      <Environment preset="sunset" />
         <OrbitControls 
           enablePan
           enableZoom
@@ -133,7 +165,13 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ poses }) => {
         <Suspense fallback={headPose ? <FallbackCube pose={headPose} /> : null}>
           <axesHelper args={[5]} />
           
-          <HeadModel ref={headRef} pose={headPose} setCameraDistance={setCameraDistance} />
+          <HeadModel 
+            ref={headRef} 
+            pose={headPose} 
+            setCameraDistance={setCameraDistance}
+            wholeModelUrl={wholeModelUrl}
+          />
+
           <TrimmerModel 
             ref={trimmerRef}
             headPose={headPose} 

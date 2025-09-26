@@ -12,24 +12,16 @@ const PhotoUpload = ({
   onPhotoUpload,
   onBaldModelReceived,
   onWholeModelReceived,
+  photos,
+  setPhotos,
+  selectPhotos,
+  setSelectPhotos
 }) => {
   const fileInputRefs = {
     front: useRef(null),
     left: useRef(null),
     right: useRef(null)
   };
-
-  const [photos, setPhotos] = useState({
-    front: { preview: null, processing: false },
-    left: { preview: null, processing: false },
-    right: { preview: null, processing: false }
-  });
-
-  const [selectPhotos, setSelectPhotos] = useState({
-    front: { preview: null},
-    left: { preview: null},
-    right: { preview: null}
-  });
 
   const [candidates, setCandidates] = useState({
     front: [],

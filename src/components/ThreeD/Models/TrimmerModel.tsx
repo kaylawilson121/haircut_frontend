@@ -151,7 +151,7 @@ const TrimmerModel = React.forwardRef<THREE.Group, TrimmerModelProps>(
             cylinder.castShadow = true;
             cylinder.receiveShadow = true;
             cylinderRef.current = cylinder;
-            meshRef.current.add(cylinder);
+            // meshRef.current.add(cylinder);
             meshRef.current.name = "TrimmerModel";
             setObjCentered(true);
           }

@@ -14,6 +14,18 @@ const Index = () => {
   const [buttonText, setButtonText] = useState('Switch to 3D World');
   const [headText, setHeadText] = useState('3D Marker Tracking with Arucos');
 
+  const [photos, setPhotos] = useState({
+    front: { preview: null, processing: false },
+    left: { preview: null, processing: false },
+    right: { preview: null, processing: false }
+  });
+
+  const [selectPhotos, setSelectPhotos] = useState({
+    front: { preview: null},
+    left: { preview: null},
+    right: { preview: null}
+  });
+
   // CameraPreview should be controlled by the ArucoDetector component itself.
   // Removing page-level camera control avoids conflicts on emulators (LD Player)
   // where multiple start/stop calls can leave the camera locked.
@@ -58,13 +70,21 @@ const Index = () => {
           </button>
 
           {showThreeScene ? (
-            <ThreeScene poses={poses} />
+            <ThreeScene 
+              poses={poses} 
+              wholeModelUrl={wholeModelUrl}
+              baldModelUrl={baldModelUrl}
+            />
           ) : (
             <>
               <PhotoUpload
                 onPhotoUpload={() => {}}
                 onBaldModelReceived={setBaldModelUrl}
                 onWholeModelReceived={setWholeModelUrl}
+                photos={photos}
+                setPhotos={setPhotos}
+                selectPhotos={selectPhotos}
+                setSelectPhotos={setSelectPhotos}
               />
               <ThreeWorld baldModelUrl={baldModelUrl} wholeModelUrl={wholeModelUrl} />
             </>
