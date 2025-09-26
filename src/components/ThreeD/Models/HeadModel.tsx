@@ -248,42 +248,67 @@ const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
       }
     }, [model, setCameraDistance, objCentered]);
 
-    const capture = (async () => {
-      console.log("Capturing frame for face mesh");
-      if (!cameraReadyRef.current) return;
-      console.log("Capturing frame for face mesh");
-      const result = await CameraPreview.captureSample({ quality: 0.4 * 100 });
-      if (!result || !result.value) {
-        console.warn('captureSample returned empty result, skipping frame');
-        return;
-      }
-      const base64Value = result.value;
-      const frameData = "data:image/jpeg;base64," + base64Value;
-      await faceMesh.send({ image: frameData });
-    })
+    const createImageFromBase64 = async (base64: string): Promise<HTMLImageElement> => {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = base64;
+      });
+    };
 
-    setInterval(capture, 100);
-    
+    const capture = async () => {
+      if (!cameraReadyRef.current) return;
+      
+      try {
+        const result = await CameraPreview.captureSample({ quality: 40 });
+        if (!result?.value) return;
+
+        const base64Value = result.value;
+        const frameData = "data:image/jpeg;base64," + base64Value;
+        
+        // Create actual HTMLImageElement
+        const img = await createImageFromBase64(frameData);
+        
+        // Process with FaceMesh
+        if (faceMesh) {
+          await faceMesh.send({ 
+            image: img,
+            width: img.width,
+            height: img.height
+          });
+        }
+      } catch (err) {
+        console.warn('Error in capture:', err);
+      }
+    };
+
+    // Use useEffect for interval to properly clean up
+    useEffect(() => {
+      const intervalId = setInterval(capture, 100);
+      return () => clearInterval(intervalId);
+    }, []);
+
+    // Move useState hook to component level
+    const [useFacePose, setUseFacePose] = useState<boolean>(true);
+
     useFrame(() => {
-      console.log("HeadModel useFrame", pose, landmark);
       if (!meshRef.current || !initialBox) return;
+      
       // derive face-based pose (from mediapipe landmarks) when points are available
       const facePose = (landmark && landmark.length > 0) ? estimateHeadPoseFromLandmarks(landmark) : null;
-      console.log("Estimated facePose from landmarks:", facePose);
-      // UI toggle to prefer face-mesh pose over aruco markers
-      const [useFacePose, setUseFacePose] = useState<boolean>(true);
-
+      
+      // Use the state variable defined at component level
       const effectiveHeadPose = facePose ? facePose : pose;
-      // const effectiveHeadPose = pose;
 
-      // Position: pose.position is in centimeters, convert to meters and invert X because camera view is mirrored
+      if (!effectiveHeadPose) return;
+
       meshRef.current.position.set(
-        -effectiveHeadPose.position[0] / 100, 
-        effectiveHeadPose.position[1] / 100, 
+        -effectiveHeadPose.position[0] / 100,
+        effectiveHeadPose.position[1] / 100,
         effectiveHeadPose.position[2] / 100
       );
 
-      // Rotation: convert degrees to radians and invert X and Y axis to match Three.js coordinate system
       const degToRad = (deg: number) => (deg * Math.PI) / 180;
       meshRef.current.rotation.set(
         degToRad(-effectiveHeadPose.rotation[0]),
