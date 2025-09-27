@@ -11,6 +11,7 @@ import { useGLTF } from '@react-three/drei';
 import { FaceMesh } from "@mediapipe/face_mesh";
 import { CameraPreview } from '@capacitor-community/camera-preview';
 import { estimateHeadPoseFromLandmarks } from '@/utils/facePoseEstimator';
+import { faceMeshService } from '@/utils/FaceMeshService';
 
 interface HeadModelProps {
   pose: {
@@ -237,64 +238,53 @@ const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
     const [landmark, setLandmark] = useState(null);
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
+    // Initialize FaceMesh
     useEffect(() => {
-      faceMesh = new FaceMesh({
-        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
-      });
+      const initFaceMesh = async () => {
+        await faceMeshService.initialize((landmarks) => {
+          setLandmark(landmarks);
+        });
+      };
+      initFaceMesh();
 
-      faceMesh.setOptions({
-        maxNumFaces: 1,
-        refineLandmarks: true,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5,
-      });
-
-      faceMesh.onResults((results) => {
-        if (results.multiFaceLandmarks.length > 0) {
-          setLandmark(results.multiFaceLandmarks[0]);
-        }
-      });
-
-      // Start capture interval
-      intervalRef.current = setInterval(capture, 100);
-
-      // Cleanup
       return () => {
+        faceMeshService.dispose();
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
         }
       };
     }, []);
 
-    const createImageFromBase64 = async (base64: string): Promise<HTMLImageElement> => {
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = base64;
-      });
-    };
-
     const capture = async () => {
       if (!cameraReadyRef.current) return;
       
       try {
-        const result = await CameraPreview.captureSample({ quality: 0.4 * 100 });
+        const result = await CameraPreview.captureSample({ quality: 40 });
         if (!result?.value) return;
 
         const base64Value = result.value;
         const frameData = "data:image/jpeg;base64," + base64Value;
-
-        // Create image for FaceMesh
+        
+        // Create and process image
         const img = new Image();
         img.onload = async () => {
-          await faceMesh.send({ image: img });
+          await faceMeshService.processImage(img);
         };
         img.src = frameData;
       } catch (err) {
         console.warn('Capture error:', err);
       }
     };
+
+    // Start capture loop
+    useEffect(() => {
+      intervalRef.current = setInterval(capture, 100);
+      return () => {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+      };
+    }, [cameraReadyRef.current]);
 
     useFrame(() => {
       if (!meshRef.current || !initialBox) return;
@@ -351,6 +341,16 @@ const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
         name="HeadModel"
         scale={ModelsConfig.HeadModel.scale}
         visible={true}
+        castShadow
+        receiveShadow
+      />
+    );
+  }
+);
+
+HeadModel.displayName = "HeadModel";
+
+export default HeadModel;
         castShadow
         receiveShadow
       />
