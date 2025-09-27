@@ -41,4 +41,3 @@ class FaceMeshService {
 }
 
 export const faceMeshService = new FaceMeshService();
-export const faceMeshService = new FaceMeshService();
