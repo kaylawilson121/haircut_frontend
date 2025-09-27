@@ -2,16 +2,13 @@ import { FaceMesh } from "@mediapipe/face_mesh";
 
 class FaceMeshService {
   private faceMesh: FaceMesh | null = null;
-  private onLandmarksUpdate: ((landmarks: any) => void) | null = null;
+  private initialized = false;
 
-  async initialize(callback: (landmarks: any) => void) {
-    if (this.faceMesh) return;
+  async initialize() {
+    if (this.initialized) return;
 
-    this.onLandmarksUpdate = callback;
     this.faceMesh = new FaceMesh({
-      locateFile: (file) => {
-        return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
-      }
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
     });
 
     await this.faceMesh.setOptions({
@@ -21,15 +18,16 @@ class FaceMeshService {
       minTrackingConfidence: 0.5
     });
 
-    this.faceMesh.onResults((results) => {
-      if (results.multiFaceLandmarks?.length > 0) {
-        this.onLandmarksUpdate?.(results.multiFaceLandmarks[0]);
-      }
-    });
+    this.initialized = true;
+  }
+
+  setResultsHandler(callback: (results: any) => void) {
+    if (!this.faceMesh) return;
+    this.faceMesh.onResults(callback);
   }
 
   async processImage(image: HTMLImageElement) {
-    if (!this.faceMesh) return;
+    if (!this.faceMesh || !this.initialized) return;
     await this.faceMesh.send({ image });
   }
 
@@ -37,8 +35,10 @@ class FaceMeshService {
     if (this.faceMesh) {
       this.faceMesh.close();
       this.faceMesh = null;
+      this.initialized = false;
     }
   }
 }
 
+export const faceMeshService = new FaceMeshService();
 export const faceMeshService = new FaceMeshService();

@@ -238,13 +238,21 @@ const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
     const [landmark, setLandmark] = useState(null);
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Initialize FaceMesh
+    // Initialize FaceMesh once
     useEffect(() => {
       const initFaceMesh = async () => {
-        await faceMeshService.initialize((landmarks) => {
-          setLandmark(landmarks);
-        });
+        try {
+          await faceMeshService.initialize();
+          faceMeshService.setResultsHandler((results) => {
+            if (results.multiFaceLandmarks?.length > 0) {
+              setLandmark(results.multiFaceLandmarks[0]);
+            }
+          });
+        } catch (err) {
+          console.error('Failed to initialize FaceMesh:', err);
+        }
       };
+
       initFaceMesh();
 
       return () => {
@@ -255,30 +263,26 @@ const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
       };
     }, []);
 
-    const capture = async () => {
+    const captureAndProcess = async () => {
       if (!cameraReadyRef.current) return;
       
       try {
         const result = await CameraPreview.captureSample({ quality: 40 });
         if (!result?.value) return;
 
-        const base64Value = result.value;
-        const frameData = "data:image/jpeg;base64," + base64Value;
-        
         // Create and process image
         const img = new Image();
-        img.onload = async () => {
-          await faceMeshService.processImage(img);
-        };
-        img.src = frameData;
+        img.onload = () => faceMeshService.processImage(img);
+        img.src = "data:image/jpeg;base64," + result.value;
       } catch (err) {
-        console.warn('Capture error:', err);
+        console.warn('Capture/process error:', err);
       }
     };
 
     // Start capture loop
     useEffect(() => {
-      intervalRef.current = setInterval(capture, 100);
+      if (!cameraReadyRef.current) return;
+      intervalRef.current = setInterval(captureAndProcess, 100);
       return () => {
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
