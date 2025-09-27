@@ -237,26 +237,30 @@ const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
     const [useFacePose, setUseFacePose] = useState<boolean>(true);
     const [landmark, setLandmark] = useState(null);
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
+    const [faceMeshError, setFaceMeshError] = useState<string | null>(null);
 
-    // Initialize FaceMesh once
+    // Initialize FaceMesh with error handling
     useEffect(() => {
       const initFaceMesh = async () => {
         try {
           await faceMeshService.initialize();
-          faceMeshService.setResultsHandler((results) => {
-            if (results.multiFaceLandmarks?.length > 0) {
-              setLandmark(results.multiFaceLandmarks[0]);
-            }
+          faceMeshService.setResultsHandler((landmarks) => {
+            setLandmark(landmarks);
           });
         } catch (err) {
-          console.error('Failed to initialize FaceMesh:', err);
+          console.error('FaceMesh init error:', err);
+          setFaceMeshError('Failed to initialize face tracking');
         }
       };
 
       initFaceMesh();
 
       return () => {
-        faceMeshService.dispose();
+        try {
+          faceMeshService.dispose();
+        } catch (e) {
+          console.warn('FaceMesh cleanup error:', e);
+        }
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
         }
@@ -276,6 +280,25 @@ const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
         img.src = "data:image/jpeg;base64," + result.value;
       } catch (err) {
         console.warn('Capture/process error:', err);
+      }
+    };
+
+    const capture = async () => {
+      if (!cameraReadyRef.current || faceMeshError) return;
+      
+      try {
+        const result = await CameraPreview.captureSample({ quality: 40 });
+        if (!result?.value) return;
+
+        // Create and process image
+        const img = new Image();
+        img.onload = () => faceMeshService.processImage(img);
+        img.src = "data:image/jpeg;base64," + result.value;
+      } catch (err) {
+        console.warn('Capture error:', err);
+        if (String(err).includes('not a constructor')) {
+          setFaceMeshError('Face tracking failed to initialize');
+        }
       }
     };
 
