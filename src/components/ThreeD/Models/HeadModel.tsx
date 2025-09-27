@@ -351,13 +351,3 @@ const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
 HeadModel.displayName = "HeadModel";
 
 export default HeadModel;
-        castShadow
-        receiveShadow
-      />
-    );
-  }
-);
-
-HeadModel.displayName = "HeadModel";
-
-export default HeadModel;
