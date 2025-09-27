@@ -106,7 +106,7 @@ const PhotoUpload = ({
 
     const dataUrl = `data:image/jpeg;base64,${result.value}`;
     await CameraPreview.stop();
-    alert("stop upload2")
+    // alert("stop upload2")
     setCapturing(false);
 
     if (capturingSlot) {
@@ -225,6 +225,7 @@ const PhotoUpload = ({
       body: JSON.stringify({ image: imageBase64 }),
     });
     const data = await res.json();
+    console.log(data);
     const bald_image = data.image;
     const img = await uploadAndReplace(bald_image);
     
