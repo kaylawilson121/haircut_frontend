@@ -20,7 +20,7 @@ interface HeadModelProps {
   setCameraDistance: (distance: number) => void;
   wholeModelUrl?: string | null;
 }
-let faceMesh, landmark;
+let faceMesh;
 const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
   ({ pose, setCameraDistance, wholeModelUrl }, ref) => {
     const meshRef = useRef<THREE.Group>(null);
@@ -94,22 +94,6 @@ const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
         }
       };
       initializeCamera();
-      faceMesh = new FaceMesh({
-        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
-      });
-      console.log(faceMesh);
-      faceMesh.setOptions({
-        maxNumFaces: 1,
-        refineLandmarks: true,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5,
-      });
-
-      faceMesh.onResults((results) => {
-        if (results.multiFaceLandmarks.length > 0) {
-          landmark = results.multiFaceLandmarks[0];
-        }
-      });
     }, [])
 
     // Load custom model when URL is provided
@@ -248,6 +232,40 @@ const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
       }
     }, [model, setCameraDistance, objCentered]);
 
+    // Move useState hook to component level
+    const [useFacePose, setUseFacePose] = useState<boolean>(true);
+    const [landmark, setLandmark] = useState(null);
+    const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+    useEffect(() => {
+      faceMesh = new FaceMesh({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+      });
+
+      faceMesh.setOptions({
+        maxNumFaces: 1,
+        refineLandmarks: true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5,
+      });
+
+      faceMesh.onResults((results) => {
+        if (results.multiFaceLandmarks.length > 0) {
+          setLandmark(results.multiFaceLandmarks[0]);
+        }
+      });
+
+      // Start capture interval
+      intervalRef.current = setInterval(capture, 100);
+
+      // Cleanup
+      return () => {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+      };
+    }, []);
+
     const createImageFromBase64 = async (base64: string): Promise<HTMLImageElement> => {
       return new Promise((resolve, reject) => {
         const img = new Image();
@@ -261,46 +279,32 @@ const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
       if (!cameraReadyRef.current) return;
       
       try {
-        const result = await CameraPreview.captureSample({ quality: 40 });
+        const result = await CameraPreview.captureSample({ quality: 0.4 * 100 });
         if (!result?.value) return;
 
         const base64Value = result.value;
         const frameData = "data:image/jpeg;base64," + base64Value;
-        
-        // Create actual HTMLImageElement
-        const img = await createImageFromBase64(frameData);
-        
-        // Process with FaceMesh
-        if (faceMesh) {
-          await faceMesh.send({ 
-            image: img,
-            width: img.width,
-            height: img.height
-          });
-        }
+
+        // Create image for FaceMesh
+        const img = new Image();
+        img.onload = async () => {
+          await faceMesh.send({ image: img });
+        };
+        img.src = frameData;
       } catch (err) {
-        console.warn('Error in capture:', err);
+        console.warn('Capture error:', err);
       }
     };
 
-    // Use useEffect for interval to properly clean up
-    useEffect(() => {
-      const intervalId = setInterval(capture, 100);
-      return () => clearInterval(intervalId);
-    }, []);
-
-    // Move useState hook to component level
-    const [useFacePose, setUseFacePose] = useState<boolean>(true);
-
     useFrame(() => {
       if (!meshRef.current || !initialBox) return;
-      
-      // derive face-based pose (from mediapipe landmarks) when points are available
-      const facePose = (landmark && landmark.length > 0) ? estimateHeadPoseFromLandmarks(landmark) : null;
-      
-      // Use the state variable defined at component level
-      const effectiveHeadPose = facePose ? facePose : pose;
 
+      // derive face-based pose (from mediapipe landmarks) when points are available
+      const facePose = (landmark && landmark.length > 0) 
+        ? estimateHeadPoseFromLandmarks(landmark) 
+        : null;
+
+      const effectiveHeadPose = useFacePose && facePose ? facePose : pose;
       if (!effectiveHeadPose) return;
 
       meshRef.current.position.set(
