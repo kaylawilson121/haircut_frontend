@@ -288,7 +288,7 @@ const PhotoUpload = ({
             photos.right.preview,
             // previews.length ? previews[0] : null,
           ],
-          should_texture : false,
+          should_texture : true,
         }),
       });
       const uploadData = await uploadRes.json();
@@ -359,7 +359,7 @@ const PhotoUpload = ({
             selectPhotos.left.preview,
             selectPhotos.right.preview,
           ],
-          should_texture : false,
+          should_texture : true,
         }),
       });
       const uploadData = await uploadRes.json();
