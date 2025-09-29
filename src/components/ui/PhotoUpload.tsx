@@ -286,7 +286,7 @@ const PhotoUpload = ({
             photos.front.preview,
             photos.left.preview,
             photos.right.preview,
-            previews.length ? previews[0] :,
+            previews.length ? previews[0] : null,
           ],
           should_texture : false,
         }),
@@ -590,7 +590,7 @@ const PhotoUpload = ({
                 className={`w-full py-3 px-10 bg-purple-700 hover:bg-purple-800 text-white rounded-lg shadow flex items-center justify-center gap-2 text-lg font-semibold transition`}
                   onClick={() => {
                     handleUploadToBackendWhole();
-                    // handleUploadToBackendBald();
+                    handleUploadToBackendBald();
                 }}
                 disabled={loading}
               >
