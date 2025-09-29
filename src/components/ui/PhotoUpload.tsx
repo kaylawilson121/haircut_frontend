@@ -288,7 +288,7 @@ const PhotoUpload = ({
             photos.right.preview,
             previews[0],
           ],
-          should_texture : true,
+          should_texture : false,
         }),
       });
       const uploadData = await uploadRes.json();
@@ -359,7 +359,7 @@ const PhotoUpload = ({
             selectPhotos.left.preview,
             selectPhotos.right.preview,
           ],
-          should_texture : true,
+          should_texture : false,
         }),
       });
       const uploadData = await uploadRes.json();
@@ -590,7 +590,7 @@ const PhotoUpload = ({
                 className={`w-full py-3 px-10 bg-purple-700 hover:bg-purple-800 text-white rounded-lg shadow flex items-center justify-center gap-2 text-lg font-semibold transition`}
                   onClick={() => {
                     handleUploadToBackendWhole();
-                    handleUploadToBackendBald();
+                    // handleUploadToBackendBald();
                 }}
                 disabled={loading}
               >
