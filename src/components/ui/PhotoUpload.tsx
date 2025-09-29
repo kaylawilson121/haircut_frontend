@@ -286,7 +286,7 @@ const PhotoUpload = ({
             photos.front.preview,
             photos.left.preview,
             photos.right.preview,
-            ...previews,
+            previews[0],
           ],
           should_texture : true,
         }),
