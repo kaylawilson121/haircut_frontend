@@ -1,21 +1,21 @@
+declare global {
+  interface Window {
+    FaceMesh: any;
+  }
+}
+
+
 class FaceMeshService {
-  private faceMesh: any = null;
+  private faceMesh: FaceMesh | null = null;
   private initialized = false;
 
   async initialize() {
     if (this.initialized) return;
 
     try {
-      // Dynamically import FaceMesh
-      const { FaceMesh } = await import('@mediapipe/face_mesh');
-      
-      // Make sure FaceMesh is available
-      if (!FaceMesh) {
-        throw new Error('FaceMesh failed to load');
-      }
-
-      this.faceMesh = new FaceMesh({
+      this.faceMesh = new window.FaceMesh({
         locateFile: (file: string) => {
+          // Use CDN URL for production
           return `/mediapipe/face_mesh/${file}`;
         }
       });
