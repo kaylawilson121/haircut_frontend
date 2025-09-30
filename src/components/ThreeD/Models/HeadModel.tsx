@@ -14,6 +14,7 @@ import { estimateHeadPoseFromLandmarks } from '@/utils/facePoseEstimator';
 import { faceMeshService } from '@/utils/FaceMeshService';
 
 interface HeadModelProps {
+  isoverrideEnabled: boolean;
   pose: {
     position: [number, number, number];
     rotation: [number, number, number];
@@ -23,7 +24,7 @@ interface HeadModelProps {
 }
 let faceMesh;
 const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
-  ({ pose, setCameraDistance, wholeModelUrl }, ref) => {
+  ({ isoverrideEnabled ,pose, setCameraDistance, wholeModelUrl }, ref) => {
     const meshRef = useRef<THREE.Group>(null);
     const [modelLoaded, setModelLoaded] = useState(false);
     const worldBoxRef = useRef<THREE.Box3>(new THREE.Box3());
@@ -170,7 +171,7 @@ const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
 
     // Set model as loaded when obj is available
     useEffect(() => {
-      if (model && meshRef.current && !objCentered) {
+      if (model && meshRef.current) {
         setModelLoaded(true);
         toast({
           title: `${ModelsConfig.HeadModel.name} 3D Model loaded successfully`,
@@ -226,17 +227,17 @@ const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
           // Add the centered object
           meshRef.current.add(centeredObj);
           meshRef.current.name = "HeadModel";
-          setObjCentered(true);
         }
         
         calculateCameraDistance(centeredLocalBox, size);
       }
-    }, [model, setCameraDistance, objCentered]);
+    }, [model, setCameraDistance]);
 
     // Move useState hook to component level
     const [useFacePose, setUseFacePose] = useState<boolean>(true);
     const [landmark, setLandmark] = useState(null);
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
+    const landmarkRef = useRef<any>(null);
     const [faceMeshError, setFaceMeshError] = useState<string | null>(null);
 
     // Initialize FaceMesh with error handling
@@ -244,8 +245,9 @@ const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
       const initFaceMesh = async () => {
         try {
           await faceMeshService.initialize();
-          faceMeshService.setResultsHandler((landmarks) => {
-            setLandmark(landmarks);
+          faceMeshService.setResultsHandler((results) => {
+            setLandmark(results.multiFaceLandmarks[0]);
+            landmarkRef.current = results.multiFaceLandmarks[0];
           });
         } catch (err) {
           console.error('FaceMesh init error:', err);
@@ -315,13 +317,11 @@ const HeadModel = React.forwardRef<THREE.Group, HeadModelProps>(
 
     useFrame(() => {
       if (!meshRef.current || !initialBox) return;
-
       // derive face-based pose (from mediapipe landmarks) when points are available
-      const facePose = (landmark && landmark.length > 0) 
-        ? estimateHeadPoseFromLandmarks(landmark) 
+      const facePose = (landmarkRef.current && landmarkRef.current.length > 0) 
+        ? estimateHeadPoseFromLandmarks(landmarkRef.current) 
         : null;
-
-      const effectiveHeadPose = useFacePose && facePose ? facePose : pose;
+      const effectiveHeadPose =  facePose ? facePose : pose;
       if (!effectiveHeadPose) return;
 
       meshRef.current.position.set(

@@ -41,6 +41,7 @@ class FaceMeshService {
 
   async processImage(image: HTMLImageElement) {
     if (!this.faceMesh || !this.initialized) return;
+    // console.log("Processing image with FaceMesh", image);
     await this.faceMesh.send({ image });
   }
 

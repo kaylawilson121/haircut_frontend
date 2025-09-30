@@ -166,7 +166,8 @@ const ThreeScene: React.FC<ThreeSceneProps> = ({ poses, wholeModelUrl, baldModel
           <axesHelper args={[5]} />
           
           <HeadModel 
-            ref={headRef} 
+            ref={headRef}
+            isoverrideEnabled={isHeadOverrideEnabled}
             pose={headPose} 
             setCameraDistance={setCameraDistance}
             wholeModelUrl={wholeModelUrl}
