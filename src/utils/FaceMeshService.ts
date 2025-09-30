@@ -16,7 +16,7 @@ class FaceMeshService {
 
       this.faceMesh = new FaceMesh({
         locateFile: (file: string) => {
-          return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/${file}`;
+          return `/mediapipe/face_mesh/${file}`;
         }
       });
 
@@ -41,7 +41,6 @@ class FaceMeshService {
 
   async processImage(image: HTMLImageElement) {
     if (!this.faceMesh || !this.initialized) return;
-    // console.log("Processing image with FaceMesh", image);
     await this.faceMesh.send({ image });
   }
 
